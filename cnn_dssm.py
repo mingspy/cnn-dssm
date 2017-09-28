@@ -27,7 +27,7 @@ class CDssm(object):
     Uses an embedding layer, followed by a convolutional, max-pooling and softmax layer.
     """
     def __init__( self, sequence_length, embedding_size, vocab_size,
-            filter_sizes, num_filters,hidden_sizes, batch_size=100, l2_reg_lambda=0.001,neg = 5):
+            filter_sizes, num_filters,hidden_sizes, batch_size=100, l2_reg_lambda=0.01,neg = 5):
         # Placeholders for input, output and dropout
         self.query_in = tf.placeholder(tf.int32, [None, sequence_length], name="query_in")
         self.doc_in = tf.placeholder(tf.int32, [None, sequence_length], name="doc_in")
@@ -80,7 +80,7 @@ class CDssm(object):
                     shape=[tmp[i], tmp[i+1] ],
                     #initializer=tf.contrib.layers.xavier_initializer())
                     initializer=tf.random_uniform_initializer(minval=-wsq,maxval=wsq))
-                b = tf.Variable(tf.constant(0.1, shape=[tmp[i+1]]), name="b_%d"%i)
+                b = tf.Variable(tf.constant(0.0001, shape=[tmp[i+1]]), name="b_%d"%i)
                 self.l2_loss += tf.nn.l2_loss(W)
                 self.l2_loss += tf.nn.l2_loss(b)
                 self.out_Ws.append(w)
@@ -144,8 +144,8 @@ class CDssm(object):
             # Apply nonlinearity
             print("\n===conv:size:%d===" % filter_size)
             print("after conv, shape is %s"%conv.get_shape())
-            #h = tf.nn.relu6(tf.nn.bias_add(conv, self.conv_bs[i]))
-            h = tf.nn.tanh(tf.nn.bias_add(conv, self.conv_bs[i]))
+            h = tf.nn.relu(tf.nn.bias_add(conv, self.conv_bs[i]))
+            #h = tf.nn.bias_add(conv, self.conv_bs[i])
             print("after relu, shape is %s"%h.get_shape())
             # Maxpooling over the outputs
             pooled = tf.nn.max_pool(
@@ -154,14 +154,17 @@ class CDssm(object):
                 strides=[1, 1, 1, 1],
                 padding='VALID')
             print("after pooled, shape is %s"%pooled.get_shape())
+            #pooled = tf.nn.tanh(pooled)
             pooled_outputs.append(pooled)
 
         # Combine all the pooled features
         num_filters_total = self.num_filters * len(self.filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
-        print("after concat, shape is %s"%h_pool.get_shape())
+        print("after concat,conved output shape is %s"%h_pool.get_shape())
         h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
-        print("after flat, shape is %s"%h_pool_flat.get_shape())
+        print("after flat, conved output shape is %s"%h_pool_flat.get_shape())
+        h_pool_flat = tf.nn.softmax(h_pool_flat)
+        print("after softmax, conved output shape is %s"%h_pool_flat.get_shape())
 
         # Add dropout
         with tf.name_scope("dropout"):
@@ -288,7 +291,7 @@ def train(restore=False):
         for batch in batches:
             x_batch, y_batch = batch
             _,step,rloss = sess.run([train_op,model.global_step,loss],
-                    feed_dict={model.query_in:x_batch, model.doc_in: y_batch, model.dropout_keep_prob:0.5})
+                    feed_dict={model.query_in:x_batch, model.doc_in: y_batch, model.dropout_keep_prob:0.8})
             if step % 10 == 0: print datetime.now(),step,rloss
             if step % 10000 == 0:
                 saver.save(sess,'./model/dssm',global_step=step)
@@ -318,7 +321,7 @@ def predict():
         for batch in batches:
             x_batch, y_batch = batch
             title_vecs,doc_vecs,rloss = sess.run([model.query_vec_pred,model.doc_vec_pred,model.loss],
-                    feed_dict={model.query_in:x_batch, model.doc_in: y_batch, model.dropout_keep_prob:0.7})
+                    feed_dict={model.query_in:x_batch, model.doc_in: y_batch, model.dropout_keep_prob:0.9})
             X += title_vecs.tolist()
             Y += doc_vecs.tolist()
             loss.append(rloss)
@@ -344,7 +347,7 @@ def predict():
 
 def test_sims(urls,X,Y,titles):
     # calc: title content sims
-    TOP = 10
+    TOP = 10000
     sims = {}
     for i in xrange(len(urls)):
         sim = 1 - cosine(X[i], Y[i])
@@ -377,7 +380,10 @@ def test_sims(urls,X,Y,titles):
         t = sorted( dsims[ti]['title_sim'].iteritems(),key=lambda x: x[1],reverse=True)[:TOP]
         c = sorted( dsims[ti]['content_sim'].iteritems(),key=lambda x: x[1],reverse=True)[:TOP]
         a = sorted( dsims[ti]['combine_sim'].iteritems(),key=lambda x: x[1],reverse=True)[:TOP]
+
+        dsims = {} # for test
         dsims[ti] = {'title_sim':t,'content_sim':c,'combine_sim':a}
+        break
 
     res = {'self_sims':sims,'doc_sims':dsims} 
 
