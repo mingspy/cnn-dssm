@@ -24,7 +24,7 @@ In my practice:
 ## cdssm2.py tanh - loss 
 ![Alt loss](https://github.com/mingspy/cnn-dssm/blob/master/cdssm2_loss_lr0.001_fout64_cf12345.png)   
 
-sentence_len = 100  
+sentence_len = 1000    
 embedding_size = 128  
 batch_size = 500  
 vocab,vocab_idx = load_vocab()  
