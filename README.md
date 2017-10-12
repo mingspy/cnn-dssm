@@ -2,6 +2,7 @@
 A tensorflow version of dssm using textcnn as feature extractor.   
 training data using document's title as query, document's content as hit doc in dssm.   
 training data size 1300w+  
+paper: https://www.microsoft.com/en-us/research/publication/learning-semantic-representations-using-convolutional-neural-networks-for-web-search/
 
 ## notations
 ### Q means query words, here using document's title
