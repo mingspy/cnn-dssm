@@ -1,5 +1,8 @@
 # cnn-dssm
 A tensorflow version of dssm using textcnn as feature extractor.
+training data using document's title as query, document's content as hit doc in dssm.
+training data size 1300w+
+
 ## notations
 ### Q means query words, here using document's title
 ### D+ means hit docs, here using document's content
@@ -18,11 +21,12 @@ In my practice:
     active function tanh get better,relu usally got nan loss
     
     
-## loss 
+## cdssm2.py tanh - loss 
 ![Alt loss](https://github.com/mingspy/cnn-dssm/blob/master/cdssm2_loss_lr0.001_fout64_cf12345.png) 
-sentence_len = 1000
-embedding_size = 128 
-batch_size = 500 
+
+sentence_len = 100
+embedding_size = 128
+batch_size = 500
 vocab,vocab_idx = load_vocab()
 vocab_size = len(vocab) # 4469
 print 'vocab_size',vocab_size
