@@ -17,7 +17,7 @@ paper: https://www.microsoft.com/en-us/research/publication/learning-semantic-re
 
 ## tricks
 In my practice:   
-    little learning_rate, such as 0.001, easier to converge   
+    little learning_rate, such as 0.001, easier to converge, when using 0.01 not coverge any more, loss jump largely.  
     small conv output,such as 64, easier to training    
     active function tanh get better,relu usally got nan loss   
     
