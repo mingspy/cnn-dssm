@@ -287,7 +287,7 @@ def train():
     print model_path, summary_path
     
     device = '1'
-    if activeFn_name == 'tanh': device = '3'
+    if training_model_name == 'tanh': device = '3'
 
     set_gpu_devices(device)
     config = new_gpu_config(0.8)
@@ -455,18 +455,20 @@ model_path = "./model_tanh"
 summary_path = "./train_summeray_tanh"
 
 '''
-activeFn_name = 'relu'
+training_model_name = 'tanh_2'
 
 if __name__ == '__main__':
 
-    if len(sys.argv) > 2 and sys.argv[2] == 'tanh':
+    if len(sys.argv) > 2:
+        training_model_name = sys.argv[2]
+    if training_model_name == 'tanh':
         NEG = 5 
         filter_sizes = [3]
         num_filters = 384
         activeFn = tf.nn.tanh
         model_path = "./model_tanh"
         summary_path = "./train_summeray_tanh"
-        activeFn_name = 'tanh'
+
     if len(sys.argv) > 1 and sys.argv[1] == 'train':
         train()
     if len(sys.argv) > 1 and sys.argv[1] == 'predict':
