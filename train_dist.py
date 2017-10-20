@@ -17,37 +17,30 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('data_dir', "hdfs://ns1-backup/user/xiulei/data/dssm","")
-tf.app.flags.DEFINE_string('train_dir', "hdfs://ns1-backup/user/xiulei/data/dssm","")
 tf.app.flags.DEFINE_string('ps_hosts', "localhost","")
 tf.app.flags.DEFINE_string('job_name', "ps","")
 tf.app.flags.DEFINE_integer('task_index', 0,"")
 tf.app.flags.DEFINE_string('worker_hosts', "localhost","")
-tf.app.flags.DEFINE_float('dropout_keep_prob', 0.9,"")
-tf.app.flags.DEFINE_integer('steps', 1000000,"")
 
-# relu
-sentence_len = 1000
-embedding_size = 128 
-batch_size = 500
-vocab_size=4469
-print 'vocab_size',vocab_size
-#filter_sizes = [3,4,5]
-filter_sizes = [1,2,3,4,5]
-num_filters = 64
-#hidden_sizes = [300,300,embedding_size]
-hidden_sizes = [embedding_size]
-NEG = 4 
-#activeFn = tf.nn.relu
+tf.app.flags.DEFINE_string('data_dir', "hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/data/dssm","")
+tf.app.flags.DEFINE_string('train_dir', "hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/output/dssm","")
+tf.app.flags.DEFINE_float('dropout_keep_prob', 0.9,"dropout keep prob for docvecs")
+tf.app.flags.DEFINE_integer('steps', 1000000,"how many steps run before end")
+tf.app.flags.DEFINE_integer('batch_size', 500,"")
+tf.app.flags.DEFINE_integer('sentence_len', 1000,"input sentence length")
+tf.app.flags.DEFINE_integer('vocab_size', 4469,"vocab size")
+tf.app.flags.DEFINE_integer('embedding_size', 128,"input embedding size")
+tf.app.flags.DEFINE_string('conv_filter_sizes', "1,2,3,4,5","conv2d sizes")
+tf.app.flags.DEFINE_integer('conv_out_channels', 64,"conv2d out channels")
+tf.app.flags.DEFINE_string('hidden_sizes', "128","hidden sizes, such as \"256,1000,128\"")
+tf.app.flags.DEFINE_integer('NEG', 4,"NEG size")
+tf.app.flags.DEFINE_float('learning_rate', 0.001,"")
+tf.app.flags.DEFINE_float('l2_reg_lambda', 0.05,"")
+
 activeFn = tf.nn.tanh
-model_path = "./model_yarn"
-summary_path = "./train_summary_yarn"
-learning_rate = 0.001
-
 is_sync = 1 
 
 def main(unused_argv):
-    global model_path,summary_path,learning_rate,batch_size,FLAGS
     ps_hosts = FLAGS.ps_hosts.split(",")
     worker_hosts = FLAGS.worker_hosts.split(",")
     n_workers = len(worker_hosts)
@@ -61,49 +54,32 @@ def main(unused_argv):
         restore = False
         data_dir = FLAGS.data_dir
         train_dir = FLAGS.train_dir
-        model_path = os.path.join(train_dir,model_path)
-        summary_path = os.path.join(train_dir,summary_path)
-        with tf.device(tf.train.replica_device_setter(
-                        worker_device="/job:worker/task:%d" % FLAGS.task_index,
-                        cluster=cluster)):
-            # loading data
-            train_files = []
+
+        with tf.device(tf.train.replica_device_setter( 
+                    worker_device="/job:worker/task:%d" % FLAGS.task_index, cluster=cluster)):
+            data_dir = FLAGS.data_dir
             print('data_dir: '+data_dir)
-            is_hdfs  = False
-            if data_dir.startswith('hdfs://'):
-                is_hdfs  = True
-                if data_dir.startswith('hdfs://ns3-backup'):
-                    client = HdfsClient(hosts='yz48226.hadoop.data.sina.com.cn:50070')
-                    fdir = data_dir.replace('hdfs://ns3-backup','')
-                elif data_dir.startswith('hdfs://ns1-backup'):
-                    client = HdfsClient(hosts='yz48212.hadoop.data.sina.com.cn:50070')
-                    fdir = data_dir.replace('hdfs://ns1-backup','')
-                fileList = client.listdir(fdir)
-                for name in fileList:
-                    name_new = os.path.join(data_dir, name)
-                    train_files.append(name_new)
-                    print('found train_file %s'%name_new)
-            else:
-                train_files = glob.glob(data_dir+'/tfrecords.dssm.*')
-                train_files.sort()
-                train_files = train_files[:5]
-                print ('train_files:%s'%train_files)
+            train_files = tf.gfile.Glob(os.path.join(data_dir,'tfrecords.dssm.*'))
+            print('train files:%s'%train_files)
 
+            query,doc=decode_from_tfrecords(train_files,FLAGS.sentence_len)
+            batch_query,batch_doc=get_batch(query,doc,FLAGS.batch_size)
 
-            query,doc=decode_from_tfrecords(train_files)
-            batch_query,batch_doc=get_batch(query,doc,batch_size)#batch 生成测试  
+            filter_sizes =[ int(i) for i in FLAGS.conv_filter_sizes.split(',') ]
+            hidden_sizes =[ int(i) for i in FLAGS.hidden_sizes.split(',') ]
 
-            # building model
-            model = CDssm(sentence_len,embedding_size,vocab_size,filter_sizes,num_filters,
-                        hidden_sizes,batch_size,activeFn=activeFn)
+            model = CDssm( FLAGS.sentence_len, FLAGS.embedding_size, FLAGS.vocab_size,
+                        filter_sizes, FLAGS.conv_out_channels, hidden_sizes, 
+                        FLAGS.batch_size, activeFn=activeFn)
             print (str(datetime.now())+ ' building modle end')
 
             query_vec = model._predict(batch_query)
             query_vec = tf.nn.dropout(query_vec, FLAGS.dropout_keep_prob)
             doc_vec = model._predict(batch_doc)
             doc_vec = tf.nn.dropout(doc_vec, FLAGS.dropout_keep_prob)
-            loss_op = model.loss_op(query_vec,doc_vec,neg=NEG,l2_reg_lambda=0.05)
-            opt = tf.train.AdamOptimizer(learning_rate)
+            loss_op = model.loss_op(query_vec,doc_vec,neg=FLAGS.NEG,l2_reg_lambda = FLAGS.l2_reg_lambda)
+
+            opt = tf.train.AdamOptimizer(FLAGS.learning_rate)
             # Optimizer
             global_step = tf.Variable(0, name="global_step", trainable=False)
             if is_sync == 1:
@@ -121,7 +97,7 @@ def main(unused_argv):
             chief_queue_runner = opt.get_chief_queue_runner()  
             init_token_op = opt.get_init_tokens_op(0) 
         sv = tf.train.Supervisor(is_chief=(FLAGS.task_index == 0),
-                    logdir = model_path,
+                    logdir = FLAGS.train_dir,
                     #init_op = init,
                     summary_op=summary,
                     #saver=saver,

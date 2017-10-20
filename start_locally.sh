@@ -16,7 +16,7 @@
 #word2vec -train train.txt -output vec.txt -size 256 -sample 1e-4 -window 7 -threads 10 -negative 5 -hs 1 -binary 0 -iter 100
 if [ $1 = train ]; then
     echo 'start training '
-    nohup python -u train2.py --data_dir=../../data/dssm --train_dir=./ >& d2v2.log  &
+    nohup python -u train.py --data_dir=../../data/dssm --train_dir=./model >& d2v2.log  &
 fi
 
 if [ $1 = predict ]; then

@@ -10,7 +10,7 @@
 nohup TensorFlow_Submit \
 --appName=gpu_cdssm_v2 \
 --archives=hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/bin/Python_tf1.2_gpu.zip#Python \
---files=./cdssm_model.py,./data_helpers.py,./mytf_utils.py,./train_dist.py \
+--files=./model.py,./data_helpers.py,./mytf_utils.py,./train_dist.py \
 --worker_memory=20480 \
 --ps_memory=20480 \
 --num_ps=1 \
@@ -19,6 +19,6 @@ nohup TensorFlow_Submit \
 --worker_cores=2 \
 --worker_gpu_cores=1 \
 --data_dir=hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/data/dssm \
---train_dir=hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/output/dssm \
+--train_dir=hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/output/dssm_dist \
 --command=Python/bin/python train_dist.py  >& dssm.log & 
 

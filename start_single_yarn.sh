@@ -10,7 +10,7 @@
 nohup TensorFlow_Submit \
 --appName=gpu_cdssm_single \
 --archives=hdfs://ns3-backup/dw_ext/sinarecmd/xiulei/bin/Python_tf1.2_gpu.zip#Python \
---files=./cdssm_model.py,./data_helpers.py,./mytf_utils.py,./train.py \
+--files=./model.py,./data_helpers.py,./mytf_utils.py,./train.py \
 --worker_memory=20480 \
 --num_ps=0 \
 --num_worker=1 \

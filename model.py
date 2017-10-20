@@ -17,21 +17,21 @@ class CDssm(object):
     Uses an embedding layer, followed by a convolutional, max-pooling and softmax layer.
     """
     def __init__( self,  sequence_length, embedding_size, vocab_size,
-            filter_sizes, num_filters,hidden_sizes, batch_size=100, activeFn=tf.nn.relu):
-        # Placeholders for input, output and dropout
-        self.query_in = tf.placeholder(tf.int32, [None, sequence_length], name="query_in")
-        self.doc_in = tf.placeholder(tf.int32, [None, sequence_length], name="doc_in")
-        self.l2_loss = tf.constant(0.0)
+            conv_filter_sizes, conv_out_channels, hidden_sizes, batch_size=100, activeFn=tf.nn.tanh):
 
-        # Keeping track of l2 regularization loss (optional)
+        # save params
         self.sequence_length = sequence_length
-        self.filter_sizes = filter_sizes
+        self.conv_filter_sizes = conv_filter_sizes
         self.embedding_size = embedding_size
-        self.num_filters = num_filters
+        self.conv_out_channels = conv_out_channels
         self.vocab_size = vocab_size
         self.hidden_sizes = hidden_sizes
         self.activeFn = activeFn
         self.batch_size = batch_size
+
+        # Placeholders for input, output and dropout
+        self.query_in = tf.placeholder(tf.int32, [None, sequence_length], name="query_in")
+        self.l2_loss = tf.constant(0.0)
 
         self.conv_ws = []
         self.conv_bs = []
@@ -49,23 +49,23 @@ class CDssm(object):
             self.l2_loss += tf.nn.l2_loss(self.embedding_W)
 
         # Create a convolution + maxpool layer for each filter size
-        for i, filter_size in enumerate(filter_sizes):
+        for i, filter_size in enumerate(conv_filter_sizes):
             with tf.name_scope("conv-maxpool-%s" % filter_size):
                 # Convolution Layer
-                filter_shape = [filter_size, embedding_size, 1, num_filters]
+                filter_shape = [filter_size, embedding_size, 1, conv_out_channels]
                 conv_W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
-                conv_b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name="b")
+                conv_b = tf.Variable(tf.constant(0.1, shape=[conv_out_channels]), name="b")
                 self.l2_loss += tf.nn.l2_loss(conv_W)
                 self.l2_loss += tf.nn.l2_loss(conv_b)
                 self.conv_ws.append(conv_W)
                 self.conv_bs.append(conv_b)
 
         # Final (unnormalized) scores and predictions
-        num_filters_total = num_filters * len(filter_sizes)
+        conv_out_channels_total = conv_out_channels * len(conv_filter_sizes)
         with tf.name_scope("output"):
             self.out_Ws = []
             self.out_bs = []
-            tmp = [num_filters_total] + hidden_sizes
+            tmp = [conv_out_channels_total] + hidden_sizes
             for i in xrange(0, len(tmp) - 1):
                 wsq = np.sqrt(6.0 / (tmp[i] + tmp[i+1]))
                 out_W = tf.get_variable(
@@ -80,7 +80,6 @@ class CDssm(object):
                 self.out_bs.append(out_b)
 
         self.query_vec_pred = self._predict(self.query_in,'query_doc')
-        self.doc_vec_pred = self._predict(self.doc_in)
 
     def loss_op(self,query_vec,doc_vec,neg=4, l2_reg_lambda=0.05): 
         tmp = tf.tile(doc_vec,[1,1])
@@ -126,7 +125,7 @@ class CDssm(object):
         print('after expanded shape %s'%embedded_chars_expanded.get_shape())
 
         pooled_outputs = []
-        for i, filter_size in enumerate(self.filter_sizes):
+        for i, filter_size in enumerate(self.conv_filter_sizes):
             # Convolution Layer
             conv = tf.nn.conv2d( embedded_chars_expanded, self.conv_ws[i],
                 strides=[1, 1, 1, 1], padding="VALID")
@@ -144,10 +143,10 @@ class CDssm(object):
             pooled_outputs.append(pooled)
 
         # Combine all the pooled features
-        num_filters_total = self.num_filters * len(self.filter_sizes)
+        conv_out_channels_total = self.conv_out_channels * len(self.conv_filter_sizes)
         h_pool = tf.concat(pooled_outputs, 3)
         print("after concat,conved output shape is %s"%h_pool.get_shape())
-        h_pool_flat = tf.reshape(h_pool, [-1, num_filters_total])
+        h_pool_flat = tf.reshape(h_pool, [-1, conv_out_channels_total])
         print("after flat, conved output shape is %s"%h_pool_flat.get_shape())
 
         scores_flat = h_pool_flat
