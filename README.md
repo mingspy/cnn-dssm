@@ -10,10 +10,8 @@ paper: https://www.microsoft.com/en-us/research/publication/learning-semantic-re
 ### D- mean negative docs, here using negative document's content
 ### p(Q,D+) = cosine(Q,D+)
 
-## cnn_dssm.py is version 1
-  loss function =  - p(Q,D+)
-## cdssm2.py is version 2
-  loss function = max{1 - p(Q,D+) + p(Q,D-),0}
+## loss fun
+l = -reduce_mean{log(p(Q,D+)) + log(1-p(Q,D-))} + lambda * L2_loss
 
 ## tricks
 In my practice:   
