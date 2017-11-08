@@ -6,11 +6,15 @@ from data_helpers import *
 from datetime import datetime
 from scipy.spatial.distance import cosine
 import json
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 def load_vocab():
+    global args
     vocab = []
     vocab_idx = {}
-    inf = open('../../data/dssm/dssm_voc.txt','r')
+    inf = open(args.vocab_path,'r')
     cnt = 0 
     for line in inf:
         c = line.strip('\n')
@@ -23,14 +27,40 @@ def load_vocab():
 
 
 def predict(graph, query_in,query_doc):
-    batch_size = 50
+    def test_phrases_sim(sess,query_doc,vocab_idx):
+        test_fname = './test_phrases.txt'
+        if not os.path.exists(test_fname): return 
+        inf = open(test_fname,'r')
+        for line in inf:
+            line = line.strip()
+            test_phrases = [i.decode('utf-8') for i in line.split('|')]
+            test_vecs = []
+            for p in test_phrases:
+                x = [1]
+                for i in p:
+                    if i in vocab_idx: x.append(int(vocab_idx[i]))
+                x = x[:args.sentence_len - 2]
+                x.append(2)
+                r = args.sentence_len - len(x)
+                for i in xrange(r):
+                    x.append(0)
+                test_vecs.append(x)
+                pass
+            test_vecs = sess.run(query_doc, feed_dict={query_in:test_vecs})
+            print test_phrases[0],':',
+            for i,w in enumerate(test_phrases):
+                if i == 0: continue
+                print  w, 1 - cosine(test_vecs[0],test_vecs[i]),
+            print '\n---------------------'
+        pass
+    batch_size = 200
     vocab,vocab_idx = load_vocab()
 
     config = new_gpu_config()
 
     with tf.Session(graph=graph, config=config) as sess:
         print datetime.now(), 'init batches'
-        batches = load_test_dssm_data('../../data/dssm/test.txt', args.sentence_len)
+        batches = load_test_dssm_data(args.test_path, args.sentence_len)
         print datetime.now(), 'init batches end'
         X = []
         Y = []
@@ -40,7 +70,6 @@ def predict(graph, query_in,query_doc):
             x_batch, y_batch = batches[0][batch*batch_size:(batch+1) * batch_size],batches[1][batch*batch_size:(batch+1) * batch_size]
             title_vecs = sess.run(query_doc, feed_dict={query_in:x_batch})
             doc_vecs = sess.run(query_doc, feed_dict={query_in:y_batch})
-            print type(title_vecs),title_vecs
             X += title_vecs.tolist()
             Y += doc_vecs.tolist()
             print( 'len X %d'% len(X))
@@ -51,8 +80,11 @@ def predict(graph, query_in,query_doc):
                     if i == 0: break
                     t.append(vocab[i])
                 titles.append(''.join(t))
+
+        test_phrases_sim(sess,query_doc,vocab_idx)
+
     urls = []
-    inf = open('../../data/dssm/test.txt','r')
+    inf = open(args.test_path,'r')
     for line in inf:
         line = line.strip()
         if not line: continue
@@ -116,9 +148,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", default="./model_yarn/", type=str, help="Frozen model file to import")  
 parser.add_argument("--frozen_model_name", default="frozen_dssm.pb", type=str, help="Frozen model file to import")  
 parser.add_argument("--sentence_len", default="1000", type=int, help="Frozen model file to import")  
+parser.add_argument("--vocab_path", default="../../data/dssm/dssm_voc.txt", type=str, help="vocab")  
+parser.add_argument("--test_path", default="../../data/dssm/test.txt", type=str, help="vocab")  
 args = parser.parse_args()  
 
-set_gpu_devices('1')
+set_gpu_devices('2')
 
 freeze_graph(args.model_dir,frozen_model_name = args.frozen_model_name)
 graph = load_graph(os.path.join(args.model_dir,args.frozen_model_name))
