@@ -37,8 +37,12 @@ def predict(graph, query_in,query_doc):
             test_vecs = []
             for p in test_phrases:
                 x = [1]
+                if p.count(' ') > 0: p = p.split(' ')
                 for i in p:
                     if i in vocab_idx: x.append(int(vocab_idx[i]))
+                    elif len(i) > 0:
+                        for j in i:
+                            if j in vocab_idx: x.append(int(vocab_idx[j]))
                 x = x[:args.sentence_len - 2]
                 x.append(2)
                 r = args.sentence_len - len(x)
