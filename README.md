@@ -11,7 +11,8 @@ paper: https://www.microsoft.com/en-us/research/publication/learning-semantic-re
 ### p(Q,D+) = cosine(Q,D+)
 
 ## loss fun
-l = -reduce_mean{log(p(Q,D+)) + log(1-p(Q,D-))} + lambda * L2_loss
+#loss = -reduce_mean{log(p(Q,D+)) + log(1-p(Q,D-))} + lambda * L2_loss
+loss = -reduce_mean{log(p(Q,D+))} + lambda * L2_loss
 
 ## tricks
 In my practice:   
