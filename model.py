@@ -111,8 +111,10 @@ class CDssm(object):
             self.neg_prob = tf.slice(prob, [0, 1], [-1, -1])
             print('neg_prob shape:%s'%self.neg_prob.get_shape())
             #self.loss = tf.maximum(1 - tf.reduce_mean(tf.log(self.hit_prob)) + tf.reduce_mean(tf.log(self.neg_prob)),0) + self.l2_loss * l2_reg_lambda
-            #self.loss = -tf.reduce_mean(tf.log(self.hit_prob)) + self.l2_loss * l2_reg_lambda
-            self.loss = -tf.reduce_mean(tf.log(self.hit_prob) + tf.log(1 - self.neg_prob)) + self.l2_loss * l2_reg_lambda
+            #max likelyhood
+            self.loss = -tf.reduce_mean(tf.log(self.hit_prob)) + self.l2_loss * l2_reg_lambda
+            # max likely min neg?
+            #self.loss = -tf.reduce_mean(tf.log(self.hit_prob) + tf.log(1 - self.neg_prob)) + self.l2_loss * l2_reg_lambda
             tf.summary.scalar("loss",self.loss)
 
         return self.loss
